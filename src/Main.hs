@@ -57,14 +57,14 @@ isHidden p = p /= "." && (head $ last $ splitOn "/" p) == '.'
 
 matchOutputConds :: Opts -> FilePath -> IO Bool
 matchOutputConds opts p = do
-    let fnMatch = (not (skipHidden opts) || (not $ isHidden p))
-    if fnMatch then matchFt (fileTypes opts) p else return False
+  let fnMatch = (not (skipHidden opts) || (not $ isHidden p))
+  if fnMatch then matchFt (fileTypes opts) p else return False
 
 
 walkOnce :: FilePath -> IO [FilePath]
 walkOnce p = do
-  e <- doesDirectoryExist p
-  if not e then return [] else do
+  isDir <- doesDirectoryExist p
+  if not isDir then return [] else do
     l <- try $ listDirectory p :: IO (Either IOException [FilePath])
 
     case l of
@@ -75,7 +75,7 @@ walkOnce p = do
 
 
 walkDir :: Opts -> Queue FilePath -> IO [FilePath]
-walkDir opts q = walkd q where
+walkDir opts = walkd where
   walkd q = case (Seq.viewl q) of
     Seq.EmptyL -> return []
     (x Seq.:< xs) -> do
