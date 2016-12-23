@@ -2,30 +2,30 @@
 
 module Main where
 
-import Control.Exception
-import qualified Data.Sequence as Seq
-import qualified Data.List as L
-import Data.List.Split
-import Options.Applicative
-import Options.Applicative.Builder
-import System.Directory
+import           Control.Exception
+import qualified Data.List                   as L
+import           Data.List.Split
+import qualified Data.Sequence               as Seq
+import           Options.Applicative
+import           Options.Applicative.Builder
+import           System.Directory
 
-import System.IO
-import System.IO.Unsafe
+import           System.IO
+import           System.IO.Unsafe
 
 data FileType = FTDir | FTFile | FTBoth deriving Show
 
 data Opts = Opts {
-  fileTypes :: FileType,
+  fileTypes  :: FileType,
   skipHidden :: Bool,
-  startDir :: FilePath
+  startDir   :: FilePath
 }
 
 parseFileType :: Monad m => String -> m FileType
 parseFileType "d" = return FTDir
 parseFileType "f" = return FTFile
 parseFileType "a" = return FTBoth
-parseFileType _ = fail "invalid type"
+parseFileType _   = fail "invalid type"
 
 optsP :: Parser Opts
 optsP = Opts
@@ -47,7 +47,7 @@ optsP = Opts
 type Queue a = Seq.Seq a
 
 matchFt :: FileType -> FilePath -> IO Bool
-matchFt FTDir = doesDirectoryExist
+matchFt FTDir  = doesDirectoryExist
 matchFt FTFile = doesFileExist
 matchFt FTBoth = \_ -> return True
 
