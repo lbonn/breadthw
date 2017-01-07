@@ -2,9 +2,10 @@ module Main where
 
 import           Control.Exception
 import qualified Data.List                   as L
+import           Data.Sequence               (Seq, (><))
 import qualified Data.Sequence               as Seq
 import           Options.Applicative
-import           Options.Applicative.Builder()
+import           Options.Applicative.Builder ()
 import           System.Directory
 import           System.FilePath
 
@@ -42,7 +43,7 @@ optsP = Opts
      <> help "Starting directory"
      <> value "." )
 
-type Queue a = Seq.Seq a
+type Queue a = Seq a
 
 matchFt :: FileType -> FilePath -> IO Bool
 matchFt FTDir  = doesDirectoryExist
@@ -52,7 +53,7 @@ matchFt FTBoth = \_ -> return True
 isHidden :: FilePath -> Bool
 isHidden p = case takeFileName p of
   '.' : _ -> True
-  _ -> False
+  _       -> False
 
 matchOutputConds :: Opts -> FilePath -> IO Bool
 matchOutputConds opts p = do
@@ -82,7 +83,7 @@ walkDir opts = walkd where
       children <- if match then walkOnce x else return []
 
       -- hum?: https://stackoverflow.com/questions/16243789/create-lazy-io-list-from-a-non-io-list
-      w <- unsafeInterleaveIO $ walkd $ xs Seq.>< Seq.fromList children
+      w <- unsafeInterleaveIO $ walkd $ xs >< Seq.fromList children
 
       return $ if match && x /= startDir opts then x : w else w
 
