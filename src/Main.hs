@@ -2,11 +2,11 @@ module Main where
 
 import           Control.Exception
 import qualified Data.List                   as L
-import           Data.List.Split
 import qualified Data.Sequence               as Seq
 import           Options.Applicative
 import           Options.Applicative.Builder()
 import           System.Directory
+import           System.FilePath
 
 import           System.IO
 import           System.IO.Unsafe
@@ -50,8 +50,9 @@ matchFt FTFile = doesFileExist
 matchFt FTBoth = \_ -> return True
 
 isHidden :: FilePath -> Bool
-isHidden p = p /= "." && head (last $ splitOn "/" p) == '.'
-
+isHidden p = case takeFileName p of
+  '.' : _ -> True
+  _ -> False
 
 matchOutputConds :: Opts -> FilePath -> IO Bool
 matchOutputConds opts p = do
@@ -69,7 +70,7 @@ walkOnce p = do
       Left e -> do
         hPrint stderr e
         return []
-      Right rl -> return $ map ((p ++ "/") ++) (L.sort rl)
+      Right rl -> return $ map (combine p) (L.sort rl)
 
 
 walkDir :: Opts -> Queue FilePath -> IO [FilePath]
@@ -90,6 +91,7 @@ mainWalk :: Opts -> IO ()
 mainWalk opts = do
   res <- walkDir opts (Seq.fromList [startDir opts])
   mapM_ putStrLn res
+
 
 main :: IO ()
 main = execParser opts >>= mainWalk
