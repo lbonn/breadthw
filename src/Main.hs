@@ -88,10 +88,13 @@ walkDir opts = walkd where
       return $ if match && x /= startDir opts then x : w else w
 
 
+formatPath :: FilePath -> String
+formatPath = normalise
+
 mainWalk :: Opts -> IO ()
 mainWalk opts = do
   res <- walkDir opts (Seq.fromList [startDir opts])
-  mapM_ putStrLn res
+  mapM_ (putStrLn . formatPath) res
 
 
 main :: IO ()
