@@ -1,5 +1,3 @@
-{-# LANGUAGE ViewPatterns #-}
-
 module Main where
 
 import           Control.Exception
@@ -7,7 +5,7 @@ import qualified Data.List                   as L
 import           Data.List.Split
 import qualified Data.Sequence               as Seq
 import           Options.Applicative
-import           Options.Applicative.Builder
+import           Options.Applicative.Builder()
 import           System.Directory
 
 import           System.IO
@@ -52,12 +50,12 @@ matchFt FTFile = doesFileExist
 matchFt FTBoth = \_ -> return True
 
 isHidden :: FilePath -> Bool
-isHidden p = p /= "." && (head $ last $ splitOn "/" p) == '.'
+isHidden p = p /= "." && head (last $ splitOn "/" p) == '.'
 
 
 matchOutputConds :: Opts -> FilePath -> IO Bool
 matchOutputConds opts p = do
-  let fnMatch = (not (skipHidden opts) || (not $ isHidden p))
+  let fnMatch = not (skipHidden opts) || not (isHidden p)
   if fnMatch then matchFt (fileTypes opts) p else return False
 
 
@@ -69,23 +67,23 @@ walkOnce p = do
 
     case l of
       Left e -> do
-        hPutStrLn stderr (show e)
+        hPrint stderr e
         return []
       Right rl -> return $ map ((p ++ "/") ++) (L.sort rl)
 
 
 walkDir :: Opts -> Queue FilePath -> IO [FilePath]
 walkDir opts = walkd where
-  walkd q = case (Seq.viewl q) of
+  walkd q = case Seq.viewl q of
     Seq.EmptyL -> return []
     (x Seq.:< xs) -> do
       match <- matchOutputConds opts x
       children <- if match then walkOnce x else return []
 
       -- hum?: https://stackoverflow.com/questions/16243789/create-lazy-io-list-from-a-non-io-list
-      w <- unsafeInterleaveIO $ walkd $ xs Seq.>< (Seq.fromList $ children)
+      w <- unsafeInterleaveIO $ walkd $ xs Seq.>< Seq.fromList children
 
-      return $ if (match && (x /= (startDir opts))) then (x : w) else w
+      return $ if match && x /= startDir opts then x : w else w
 
 
 mainWalk :: Opts -> IO ()
