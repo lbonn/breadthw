@@ -5,12 +5,13 @@ import qualified Data.List                   as L
 import           Data.Sequence               (Seq, (><))
 import qualified Data.Sequence               as Seq
 import           Options.Applicative
-import           Options.Applicative.Builder ()
 import           System.Directory
 import           System.FilePath
 
 import           System.IO
 import           System.IO.Unsafe
+
+import           GHC.Unicode
 
 data FileType = FTDir | FTFile | FTBoth deriving Show
 
@@ -55,10 +56,19 @@ isHidden p = case takeFileName p of
   '.' : _ : _ -> True
   _       -> False
 
+escapeWronglyEncoded :: String -> String
+escapeWronglyEncoded = map esc where
+  esc c = if isPrint c then c
+    else '\65533'  -- Unicode REPLACEMENT CHARACTER
+
 matchOutputConds :: Opts -> FilePath -> IO Bool
-matchOutputConds opts p = do
-  let fnMatch = not (skipHidden opts) || not (isHidden p)
-  if fnMatch then matchFt (fileTypes opts) p else return False
+matchOutputConds opts p =
+  if not $ all isPrint p then do
+    hPutStrLn stderr $ "bad encoding: " ++ escapeWronglyEncoded p
+    return False
+  else do
+    let fnMatch = not (skipHidden opts) || not (isHidden p)
+    if fnMatch then matchFt (fileTypes opts) p else return False
 
 
 walkOnce :: FilePath -> IO [FilePath]
