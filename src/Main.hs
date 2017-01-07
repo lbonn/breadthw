@@ -52,7 +52,7 @@ matchFt FTBoth = \_ -> return True
 
 isHidden :: FilePath -> Bool
 isHidden p = case takeFileName p of
-  '.' : _ -> True
+  '.' : _ : _ -> True
   _       -> False
 
 matchOutputConds :: Opts -> FilePath -> IO Bool
