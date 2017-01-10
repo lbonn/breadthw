@@ -1,9 +1,9 @@
 module Main where
 
 import           Control.Exception
-import qualified Data.List                   as L
-import           Data.Sequence               (Seq, (><))
-import qualified Data.Sequence               as Seq
+import qualified Data.List           as L
+import           Data.Sequence       (Seq, (><))
+import qualified Data.Sequence       as Seq
 import           Options.Applicative
 import           System.Directory
 import           System.FilePath
@@ -54,7 +54,7 @@ matchFt FTBoth = \_ -> return True
 isHidden :: FilePath -> Bool
 isHidden p = case takeFileName p of
   '.' : _ : _ -> True
-  _       -> False
+  _           -> False
 
 escapeWronglyEncoded :: String -> String
 escapeWronglyEncoded = map esc where
