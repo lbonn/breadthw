@@ -1,17 +1,18 @@
 module Main where
 
 import           Control.Exception
+import           Control.Monad
 import qualified Data.List           as L
 import           Data.Sequence       (Seq, (><))
 import qualified Data.Sequence       as Seq
 import           Options.Applicative
+import           Pipes
 import           System.Directory
 import           System.FilePath
-
 import           System.IO
-import           System.IO.Unsafe
 
 import           GHC.Unicode
+
 
 data FileType = FTDir | FTFile | FTBoth deriving Show
 
@@ -43,8 +44,6 @@ optsP = Opts
       ( metavar "DIR"
      <> help "Starting directory"
      <> value "." )
-
-type Queue a = Seq a
 
 matchFt :: FileType -> FilePath -> IO Bool
 matchFt FTDir  = doesDirectoryExist
@@ -84,27 +83,27 @@ walkOnce p = do
       Right rl -> return $ map (combine p) (L.sort rl)
 
 
-walkDir :: Opts -> Queue FilePath -> IO [FilePath]
+walkDir :: Opts -> Seq FilePath -> Producer FilePath IO ()
 walkDir opts = walkd where
   walkd q = case Seq.viewl q of
-    Seq.EmptyL -> return []
+    Seq.EmptyL -> return ()
     (x Seq.:< xs) -> do
-      match <- matchOutputConds opts x
-      children <- if match then walkOnce x else return []
+      match <- liftIO $ matchOutputConds opts x
+      children <- liftIO $ if match then walkOnce x else return []
 
-      -- hum?: https://stackoverflow.com/questions/16243789/create-lazy-io-list-from-a-non-io-list
-      w <- unsafeInterleaveIO $ walkd $ xs >< Seq.fromList children
+      when (match && x /= startDir opts) (yield x)
 
-      return $ if match && x /= startDir opts then x : w else w
+      walkd $ xs >< Seq.fromList children
 
 
 formatPath :: FilePath -> String
 formatPath = normalise
 
 mainWalk :: Opts -> IO ()
-mainWalk opts = do
-  res <- walkDir opts (Seq.fromList [startDir opts])
-  mapM_ (putStrLn . formatPath) res
+mainWalk opts = runEffect $ for walk disp
+  where
+    walk = walkDir opts (Seq.fromList [startDir opts])
+    disp = lift . putStrLn . formatPath
 
 
 main :: IO ()
