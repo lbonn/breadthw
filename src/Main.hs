@@ -4,17 +4,18 @@ import           Protolude           hiding ((<>))
 
 import           Control.Exception
 import           Control.Monad
-import qualified Data.List           as L
+import           Control.Monad.Trans.Maybe
+import qualified Data.List                 as L
 import           Data.Monoid
-import           Data.Sequence       (Seq, (><))
-import qualified Data.Sequence       as Seq
-import qualified Data.Text           as T
+import           Data.Sequence             (Seq, (><))
+import qualified Data.Sequence             as Seq
+import qualified Data.Text                 as T
 import qualified Data.Text.IO
-import qualified Options.Applicative as OA
-import           Pipes               hiding (for)
-import qualified Pipes               as P
+import qualified Options.Applicative       as OA
+import           Pipes                     hiding (for)
+import qualified Pipes                     as P
 import           System.Directory
-import           System.IO           (hPutStrLn)
+import           System.IO                 (hPutStrLn)
 
 import           GHC.Unicode
 
@@ -77,13 +78,20 @@ escapeWronglyEncoded = T.map esc where
 
 -- validate a candidate for output (or not)
 matchOutputConds :: Opts -> TextPath -> IO Bool
-matchOutputConds opts p =
-  if not $ T.all isPrint p then do
-    hPutStrLn stderr . T.unpack $ "bad encoding: " `mappend` escapeWronglyEncoded p
-    return False
-  else do
-    let fnMatch = not (skipHidden opts) || not (isHidden p)
-    if fnMatch then matchFt (fileTypes opts) p else return False
+matchOutputConds opts p = map isJust $ runMaybeT $ do
+  -- is it badly encoded?
+  unless (T.all isPrint p) (do
+      lift $ hPutStrLn stderr . T.unpack $ "bad encoding: " `mappend` escapeWronglyEncoded p
+      fail "badly encoded"
+      )
+
+  -- is it hidden and hidden files are skipped
+  when (skipHidden opts && isHidden p) $ fail "hidden file"
+
+  -- is it the correct file type?
+  mft <- liftIO $ matchFt (fileTypes opts) p
+  unless mft $ fail "unwanted file type"
+
   where
     matchFt :: FileType -> TextPath -> IO Bool
     matchFt FTDir  = doesDirectoryExist . T.unpack
