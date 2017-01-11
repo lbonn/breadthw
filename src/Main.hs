@@ -1,6 +1,6 @@
 module Main where
 
-import           Protolude           hiding ((<>))
+import           Protolude                 hiding ((<>))
 
 import           Control.Exception
 import           Control.Monad
@@ -24,9 +24,10 @@ type TextPath = Text
 data FileType = FTDir | FTFile | FTBoth deriving Show
 
 data Opts = Opts {
-  fileTypes  :: FileType,
-  skipHidden :: Bool,
-  startDir   :: TextPath
+  fileTypes      :: FileType,
+  skipHidden     :: Bool,
+  followSymlinks :: Bool,
+  startDir       :: TextPath
 }
 
 parseFileType ::  (Monad m, IsString a, Eq a) => a -> m FileType
@@ -47,6 +48,10 @@ optsP = Opts
       ( OA.long "skip-hidden"
      <> OA.short 's'
      <> OA.help "Whether to walk into hidden dirs/files" )
+  <*> OA.switch
+      ( OA.long "follow-symlink"
+     <> OA.short 'f'
+     <> OA.help "Whether to follow symlinks (dangerous)" )
   <*> OA.argument (map T.pack OA.str)
       ( OA.metavar "DIR"
      <> OA.help "Starting directory"
@@ -100,13 +105,18 @@ matchOutputConds opts p = map isJust $ runMaybeT $ do
 
 
 -- walk one level into a dir at once
-walkOnce :: TextPath -> IO [TextPath]
-walkOnce p = map (fromMaybe []) $ runMaybeT $ do
+walkOnce :: Opts -> TextPath -> IO [TextPath]
+walkOnce opts p = map (fromMaybe []) $ runMaybeT $ do
   -- is it a directory?
-  isDir <- liftIO $ doesDirectoryExist up
+  isDir <- liftIO $ doesDirectoryExist pR
   unless isDir $ fail "not a directory"
 
-  l <- liftIO (try $ listDirectory up :: IO (Either IOException [FilePath]))
+  -- is it a symlink?
+  unless (followSymlinks opts) $ do
+    isSymlink <- liftIO $ isSymbolicLink pR
+    when isSymlink $ fail "symlink"
+
+  l <- liftIO (try $ listDirectory pR :: IO (Either IOException [FilePath]))
 
   case l of
     Left e -> do
@@ -116,7 +126,7 @@ walkOnce p = map (fromMaybe []) $ runMaybeT $ do
       return $ map (combine p) (L.sort trl)
       where trl = map T.pack rl
   where
-    up = T.unpack p
+    pR = T.unpack p
 
 
 -- recursive walk
@@ -126,7 +136,7 @@ walkDir opts = walkd where
     Seq.EmptyL -> return ()
     (x Seq.:< xs) -> do
       match <- liftIO $ matchOutputConds opts x
-      children <- liftIO $ if match then walkOnce x else return []
+      children <- liftIO $ if match then walkOnce opts x else return []
 
       when (match && x /= startDir opts) (yield x)
 
