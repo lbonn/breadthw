@@ -101,18 +101,20 @@ matchOutputConds opts p = map isJust $ runMaybeT $ do
 
 -- walk one level into a dir at once
 walkOnce :: TextPath -> IO [TextPath]
-walkOnce p = do
-  isDir <- doesDirectoryExist up
-  if not isDir then return [] else do
-    l <- try $ listDirectory up :: IO (Either IOException [FilePath])
+walkOnce p = map (fromMaybe []) $ runMaybeT $ do
+  -- is it a directory?
+  isDir <- liftIO $ doesDirectoryExist up
+  unless isDir $ fail "not a directory"
 
-    case l of
-      Left e -> do
-        hPutStrLn stderr (T.unpack . show $ e)
-        return []
-      Right rl -> return $ map (combine p) (L.sort trl)
-        where
-          trl = map T.pack rl
+  l <- liftIO (try $ listDirectory up :: IO (Either IOException [FilePath]))
+
+  case l of
+    Left e -> do
+      liftIO $ hPutStrLn stderr (T.unpack . show $ e)
+      return []
+    Right rl ->
+      return $ map (combine p) (L.sort trl)
+      where trl = map T.pack rl
   where
     up = T.unpack p
 
