@@ -1,5 +1,4 @@
 TODO
 ====
 
-* use pipes
-* use true paths
+* option to set maximum depth?
