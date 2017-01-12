@@ -63,32 +63,33 @@ fileName :: TextPath -> TextPath
 fileName = T.takeWhileEnd (/= '/')
 
 combine :: TextPath -> TextPath -> TextPath
-combine p1 p2 = if "/" `T.isSuffixOf` p1
-  then
-    p1 <> p2
-  else
-    p1 <> "/" <> p2
+combine p1 p2 =
+  if "/" `T.isSuffixOf` p1
+     then p1 <> p2
+     else p1 <> "/" <> p2
 
 isHidden :: TextPath -> Bool
-isHidden p = case T.stripPrefix "." $ fileName p of
-  Nothing -> False
-  Just "" -> False
-  Just _  -> True
+isHidden p =
+  case T.stripPrefix "." $ fileName p of
+    Nothing -> False
+    Just "" -> False
+    Just _  -> True
 
 -- escape bad unicode to avoid runtime error at print
 escapeWronglyEncoded :: Text -> Text
 escapeWronglyEncoded = T.map esc where
-  esc c = if isPrint c then c
-    else '\65533'  -- Unicode REPLACEMENT CHARACTER
+  esc c =
+    if isPrint c
+       then c
+       else '\65533'  -- Unicode REPLACEMENT CHARACTER
 
 -- validate a candidate for output (or not)
 matchOutputConds :: Opts -> TextPath -> IO Bool
 matchOutputConds opts p = map isJust $ runMaybeT $ do
   -- is it badly encoded?
-  unless (T.all isPrint p) (do
-      lift $ hPutStrLn stderr . T.unpack $ "bad encoding: " `mappend` escapeWronglyEncoded p
-      fail "badly encoded"
-      )
+  unless (T.all isPrint p) $ do
+    lift $ hPutStrLn stderr . T.unpack $ "bad encoding: " `mappend` escapeWronglyEncoded p
+    fail "badly encoded"
 
   -- is it hidden and hidden files are skipped
   when (skipHidden opts && isHidden p) $ fail "hidden file"
@@ -97,11 +98,11 @@ matchOutputConds opts p = map isJust $ runMaybeT $ do
   mft <- liftIO $ matchFt (fileTypes opts) p
   unless mft $ fail "unwanted file type"
 
-  where
-    matchFt :: FileType -> TextPath -> IO Bool
-    matchFt FTDir  = doesDirectoryExist . T.unpack
-    matchFt FTFile = doesFileExist . T.unpack
-    matchFt FTBoth = \_ -> return True
+ where
+   matchFt :: FileType -> TextPath -> IO Bool
+   matchFt FTDir  = doesDirectoryExist . T.unpack
+   matchFt FTFile = doesFileExist . T.unpack
+   matchFt FTBoth = \_ -> return True
 
 
 -- walk one level into a dir at once
@@ -132,15 +133,16 @@ walkOnce opts p = map (fromMaybe []) $ runMaybeT $ do
 -- recursive walk
 walkDir :: Opts -> Seq TextPath -> Producer TextPath IO ()
 walkDir opts = walkd where
-  walkd q = case Seq.viewl q of
-    Seq.EmptyL -> return ()
-    (x Seq.:< xs) -> do
-      match <- liftIO $ matchOutputConds opts x
-      children <- liftIO $ if match then walkOnce opts x else return []
+  walkd q =
+    case Seq.viewl q of
+      Seq.EmptyL -> return ()
+      (x Seq.:< xs) -> do
+        match <- liftIO $ matchOutputConds opts x
+        children <- liftIO $ if match then walkOnce opts x else return []
 
-      when (match && x /= startDir opts) (yield x)
+        when (match && x /= startDir opts) (yield x)
 
-      walkd $ xs >< Seq.fromList children
+        walkd $ xs >< Seq.fromList children
 
 
 -- small cosmetic arrangement
