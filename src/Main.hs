@@ -131,8 +131,9 @@ walkOnce opts p = map (fromMaybe []) $ runMaybeT $ do
 
 
 -- recursive walk
-walkDir :: Opts -> Seq TextPath -> Producer TextPath IO ()
-walkDir opts = walkd where
+walkDir :: Opts -> Producer TextPath IO ()
+walkDir opts = walkd (Seq.fromList [startDir opts]) where
+  walkd :: Seq TextPath  -> Producer TextPath IO ()
   walkd q =
     case Seq.viewl q of
       Seq.EmptyL -> return ()
@@ -151,9 +152,8 @@ formatPath p = p `fromMaybe` T.stripPrefix "./" p
 
 
 mainWalk :: Opts -> IO ()
-mainWalk opts = runEffect $ P.for walk disp
+mainWalk opts = runEffect $ P.for (walkDir opts) disp
   where
-    walk = walkDir opts (Seq.fromList [startDir opts])
     disp = lift . putStrLn . formatPath
 
 main :: IO ()
