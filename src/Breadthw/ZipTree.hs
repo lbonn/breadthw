@@ -54,22 +54,24 @@ upToRoot :: ZipTree a -> ZipTree a
 upToRoot = farthest upward
 
 goRight :: ZipTree a -> Maybe (ZipTree a)
+goRight (_, []) = Nothing
 goRight (t, Step r nc lf rf : st) =
   case Seq.viewl rf of
     Seq.EmptyL     -> Nothing
     (nt Seq.:< xs) -> Just (nt, Step r (nc + 1) (lf |> t) xs : st)
 
 goLeft :: ZipTree a -> Maybe (ZipTree a)
+goLeft (_, []) = Nothing
 goLeft (t, Step r nc lf rf : st) =
   case Seq.viewr lf of
     Seq.EmptyR     -> Nothing
     (xs Seq.:> nt) -> Just (nt, Step r (nc - 1) xs (t <| rf) : st)
 
 downChild :: Int -> ZipTree a -> Maybe (ZipTree a)
-downChild k (Node r forest, steps) =
+downChild k (Node r forest, stps) =
   if k >= length forest
      then Nothing
-     else Just (child, step : steps)
+     else Just (child, step : stps)
        where
          child = Seq.index forest k
          step = Step r k before (Seq.drop 1 after)
@@ -81,10 +83,10 @@ downChildren t = fromMaybe [] $ do
   Just $ accum goRight firstChild
 
 pathFromRoot :: ZipTree a -> [Int]
-pathFromRoot (_, steps) = reverse $ map (\(Step _ k _ _) -> k) steps
+pathFromRoot (_, stps) = reverse $ map (\(Step _ k _ _) -> k) stps
 
 elemsFromRoot :: ZipTree a -> [a]
-elemsFromRoot (_, steps) = reverse $ map (\(Step e _ _ _) -> e) steps
+elemsFromRoot (_, stps) = reverse $ map (\(Step e _ _ _) -> e) stps
 
 goPath :: [Int] -> ZipTree a -> Maybe (ZipTree a)
 goPath [] t = Just t
