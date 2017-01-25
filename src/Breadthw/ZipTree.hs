@@ -1,6 +1,6 @@
 module Breadthw.ZipTree where
 
-import           Protolude
+import           Protolude hiding (orElse)
 
 -- import qualified Data.List     as L
 import           Data.Sequence (Seq, (><), (|>), (<|))
@@ -23,6 +23,16 @@ fromTree t = (t, [])
 
 view :: ZipTree a -> Tree a
 view (t, _) = t
+
+steps :: ZipTree a -> Steps a
+steps (_, st) = st
+
+depth :: ZipTree a -> Int
+depth (_, st) = length st
+
+idInParent :: ZipTree a -> Maybe Int
+idInParent (_, []) = Nothing
+idInParent (_, Step _ k _ _ : _) = Just k
 
 farthest :: (a -> Maybe a) -> a -> a
 farthest f e =
@@ -85,3 +95,46 @@ foldPath f c [] t = Just $ f c (root $ view t)
 foldPath f c (x:xs) t = do
   child <- downChild x t
   foldPath f (f c (root $ view t)) xs child
+
+
+-- movements for breadth search
+
+orElse :: Maybe a -> Maybe a -> Maybe a
+orElse (Just e) _ = Just e
+orElse Nothing n = n
+
+
+-- FIXME: inefficient O(Depth*NChildren), could be O(depth)
+childrenRightOfPath :: ZipTree a -> [Int] -> [ZipTree a]
+childrenRightOfPath zt p = filter (\c -> p < pathFromRoot c) $ downChildren zt
+
+goDownRightOfPath :: ZipTree a -> [Int] -> Maybe (ZipTree a)
+goDownRightOfPath zt p = head $ childrenRightOfPath zt p
+
+
+goAbsRight :: ZipTree a -> Maybe (ZipTree a)
+goAbsRight zt = expl zt
+  where
+    startPath = pathFromRoot zt
+    tdepth = depth zt
+    --
+    expl :: ZipTree a -> Maybe (ZipTree a)
+    expl z = if depth z == tdepth && pathFromRoot z > startPath
+                then Just z
+                else do
+                  next <- goDownRightOfPath z startPath `orElse` upward z
+                  expl next
+
+goDepthFarLeft :: ZipTree a -> Int -> Maybe (ZipTree a)
+goDepthFarLeft zt d = goFarLeft zt
+  where
+    goFarLeft z =
+      if depth z == d
+         then Just z
+         else foldr (orElse . goFarLeft) Nothing $ downChildren z
+
+breadthNext :: ZipTree a -> Maybe (ZipTree a)
+breadthNext zt =
+  goAbsRight zt `orElse` goDepthFarLeft zt (d + 1)
+    where
+      d = depth zt
