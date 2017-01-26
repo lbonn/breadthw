@@ -115,20 +115,20 @@ goDownRightOfPath zt p = head $ childrenRightOfPath zt p
 
 
 goAbsRight :: ZipTree a -> Maybe (ZipTree a)
-goAbsRight zt = expl zt
+goAbsRight zt = expl startPath zt
   where
     startPath = pathFromRoot zt
     tdepth = depth zt
-    --
-    expl :: ZipTree a -> Maybe (ZipTree a)
-    expl z = if depth z == tdepth && pathFromRoot z > startPath
-                then Just z
-                else do
-                  next <- goDownRightOfPath z startPath `orElse` upward z
-                  expl next
+    expl path z = if depth z == tdepth && cPath > startPath
+                     then Just z
+                     else do
+                       next <- goDownRightOfPath z path `orElse` upward z
+                       expl cPath next
+                    where
+                      cPath = pathFromRoot z
 
 goDepthFarLeft :: ZipTree a -> Int -> Maybe (ZipTree a)
-goDepthFarLeft zt d = goFarLeft zt
+goDepthFarLeft zt d = goFarLeft $ upToRoot zt
   where
     goFarLeft z =
       if depth z == d
@@ -137,6 +137,4 @@ goDepthFarLeft zt d = goFarLeft zt
 
 breadthNext :: ZipTree a -> Maybe (ZipTree a)
 breadthNext zt =
-  goAbsRight zt `orElse` goDepthFarLeft zt (d + 1)
-    where
-      d = depth zt
+  goAbsRight zt `orElse` goDepthFarLeft zt (depth zt + 1)
