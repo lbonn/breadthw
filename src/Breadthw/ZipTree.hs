@@ -101,10 +101,6 @@ foldPath f c (x:xs) t = do
 
 -- movements for breadth search
 
-orElse :: Maybe a -> Maybe a -> Maybe a
-orElse (Just e) _ = Just e
-orElse Nothing n = n
-
 
 -- FIXME: inefficient O(Depth*NChildren), could be O(depth)
 childrenRightOfPath :: ZipTree a -> [Int] -> [ZipTree a]
@@ -122,7 +118,7 @@ goAbsRight zt = expl startPath zt
     expl path z = if depth z == tdepth && cPath > startPath
                      then Just z
                      else do
-                       next <- goDownRightOfPath z path `orElse` upward z
+                       next <- goDownRightOfPath z path <|> upward z
                        expl cPath next
                     where
                       cPath = pathFromRoot z
@@ -133,8 +129,8 @@ goDepthFarLeft zt d = goFarLeft $ upToRoot zt
     goFarLeft z =
       if depth z == d
          then Just z
-         else foldr (orElse . goFarLeft) Nothing $ downChildren z
+         else asum (map goFarLeft $ downChildren z)
 
 breadthNext :: ZipTree a -> Maybe (ZipTree a)
 breadthNext zt =
-  goAbsRight zt `orElse` goDepthFarLeft zt (depth zt + 1)
+  goAbsRight zt <|> goDepthFarLeft zt (depth zt + 1)
