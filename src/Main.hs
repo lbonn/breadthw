@@ -1,6 +1,7 @@
 module Main where
 
 import           Protolude                 hiding ((<>))
+import           Prelude                   (String)
 
 import           Control.Exception
 import           Control.Monad
@@ -30,15 +31,15 @@ data Opts = Opts {
   startDir       :: TextPath
 }
 
-parseFileType ::  (Monad m, IsString a, Eq a) => a -> m FileType
+parseFileType ::  (IsString a, Eq a) => a -> Either String FileType
 parseFileType "d" = return FTDir
 parseFileType "f" = return FTFile
 parseFileType "a" = return FTBoth
-parseFileType _   = fail "invalid type"
+parseFileType _   = fail "type should be \"a\", \"f\" or \"d\""
 
 optsP :: OA.Parser Opts
 optsP = Opts
-  <$> OA.option (OA.str >>= parseFileType)
+  <$> OA.option (OA.eitherReader parseFileType)
       ( OA.long "file-type"
      <> OA.short 't'
      <> OA.help "File types to return (a|f|d)"
