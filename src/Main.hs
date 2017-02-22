@@ -114,7 +114,7 @@ walkOnce opts p = map (fromMaybe []) $ runMaybeT $ do
 
   -- is it a symlink?
   unless (followSymlinks opts) $ do
-    isSymlink <- liftIO $ isSymbolicLink pR
+    isSymlink <- liftIO $ pathIsSymbolicLink pR
     when isSymlink $ fail "symlink"
 
   l <- liftIO (try $ listDirectory pR :: IO (Either IOException [FilePath]))
