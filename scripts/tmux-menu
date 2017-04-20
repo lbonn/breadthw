@@ -4,8 +4,8 @@ set -e
 
 cd "$HOME"
 
-open_term() {
-    cd "$dir" && i3-sensible-terminal -e tnew
-}
+dir=$(breadthw -t d -s | rofi -dmenu -p 'tmux: ' -matching fuzzy)
 
-breadthw -t d -s | rofi -dmenu -p 'tmux: ' -matching fuzzy | (read -r dir && [ "$dir" ] && open_term "$dir")
+[ "$dir" ] && cd "$dir"
+
+exec i3-sensible-terminal -e tnew
