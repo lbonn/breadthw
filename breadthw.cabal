@@ -46,7 +46,9 @@ test-suite breadthw-test
                      , protolude
                      , breadthw
                      , containers >= 0.5.7 && < 0.6
-                     , HUnit >= 1.3.1.2 && < 1.6
+                     , tasty
+                     , tasty-hunit
+                     , tasty-quickcheck
   ghc-options:         -W -Wall -threaded -rtsopts -with-rtsopts=-N
   default-language:    Haskell2010
   default-extensions:  OverloadedStrings, NoImplicitPrelude
