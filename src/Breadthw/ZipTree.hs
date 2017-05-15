@@ -10,6 +10,9 @@ import qualified Data.Sequence as Seq
 data Tree a = Node a (Forest a) deriving (Show, Eq)
 type Forest a = Seq (Tree a)
 
+size :: Tree a -> Int
+size (Node e for) = foldr ((+) . size) 1 for
+
 data Step a = Step a Int (Forest a) (Forest a) deriving (Show, Eq)
 type Steps a = [Step a]
 
@@ -34,6 +37,7 @@ idInParent :: ZipTree a -> Maybe Int
 idInParent (_, []) = Nothing
 idInParent (_, Step _ k _ _ : _) = Just k
 
+-- | apply a function repeatedly until 'Nothing'
 farthest :: (a -> Maybe a) -> a -> a
 farthest f e =
   case f e of
@@ -134,3 +138,6 @@ goDepthFarLeft zt d = goFarLeft $ upToRoot zt
 breadthNext :: ZipTree a -> Maybe (ZipTree a)
 breadthNext zt =
   goAbsRight zt <|> goDepthFarLeft zt (depth zt + 1)
+
+instance Foldable Tree where
+  foldr f x0 t = foldr f x0 (map (root . view) $ accum breadthNext $ fromTree t)
