@@ -11,7 +11,7 @@ data Tree a = Node a (Forest a) deriving (Show, Eq)
 type Forest a = Seq (Tree a)
 
 size :: Tree a -> Int
-size (Node e for) = foldr ((+) . size) 1 for
+size (Node _ forest) = foldr ((+) . size) 1 forest
 
 data Step a = Step a Int (Forest a) (Forest a) deriving (Show, Eq)
 type Steps a = [Step a]
@@ -105,10 +105,16 @@ foldPath f c (x:xs) t = do
 
 -- movements for breadth search
 
-
--- FIXME: inefficient O(Depth*NChildren), could be O(depth)
 childrenRightOfPath :: ZipTree a -> [Int] -> [ZipTree a]
-childrenRightOfPath zt p = filter (\c -> p < pathFromRoot c) $ downChildren zt
+childrenRightOfPath zt p | pathFromRoot zt < truncP = []
+                         | pathFromRoot zt > truncP = downChildren zt
+                         | otherwise                = drop (n+1) (downChildren zt)
+  where
+    truncP = take (depth zt) p
+    n = fromMaybe 0 (atMay p (depth zt))
+
+-- Note: naive implementation
+-- childrenRightOfPath zt p = filter (\c -> p < pathFromRoot c) $ downChildren zt
 
 goDownRightOfPath :: ZipTree a -> [Int] -> Maybe (ZipTree a)
 goDownRightOfPath zt p = head $ childrenRightOfPath zt p
@@ -119,13 +125,13 @@ goAbsRight zt = expl startPath zt
   where
     startPath = pathFromRoot zt
     tdepth = depth zt
-    expl path z = if depth z == tdepth && cPath > startPath
-                     then Just z
-                     else do
-                       next <- goDownRightOfPath z path <|> upward z
-                       expl cPath next
-                    where
-                      cPath = pathFromRoot z
+    expl path z | depth z == tdepth && cPath > startPath = Just z
+                | otherwise                              = do
+                    -- trace (show path <> (show . view $ z) :: Text) (return ())
+                    next <- goDownRightOfPath z path <|> upward z
+                    expl cPath next
+      where
+        cPath = pathFromRoot z
 
 goDepthFarLeft :: ZipTree a -> Int -> Maybe (ZipTree a)
 goDepthFarLeft zt d = goFarLeft $ upToRoot zt
