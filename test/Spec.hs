@@ -29,19 +29,16 @@ viewRoot = root . view
 
 hTests :: TestTree
 hTests = testGroup "Unit tests"
-  [ testCase "Go far left" (
-    let z = fromJust $ goPath [1, 1] bigZt in
-    assertEqual "far left" 4 $ viewRoot . fromJust $ goDepthFarLeft z 2
-  )
+  [ testCase "Go far left" $
+      let z = fromJust $ goPath [1, 1] bigZt in
+      assertEqual "far left" 4 $ viewRoot . fromJust $ goDepthFarLeft z 2
 
-  , testCase "Breadth-next root" (
-    assertEqual "Breadth next" 2 (viewRoot . fromJust $ breadthNext bigZt)
-  )
+  , testCase "Breadth-next root" $
+      assertEqual "Breadth next" 2 (viewRoot . fromJust $ breadthNext bigZt)
 
-  , testCase "Breadth-first traversal" (
-    let traversal = foldr (\e l -> (root . view) e : l) [] (accum breadthNext bigZt) in
-    assertEqual "Breadth traversal" [1,2,3,4,5,6,7,8,9,10,11] traversal
-  )
+  , testCase "Breadth-first traversal" $
+      let traversal = foldr (\e l -> (root . view) e : l) [] (accum breadthNext bigZt) in
+      assertEqual "Breadth traversal" [1,2,3,4,5,6,7,8,9,10,11] traversal
   ]
 
 -- quickcheck
@@ -71,14 +68,12 @@ isAsc (x1:x2:xs) = x1 <= x2 && isAsc (x2:xs)
 qTests :: TestTree
 qTests = testGroup "Quick checks"
   [ testGroup "Breadth-first traversal"
-    [ testProperty "Exhaustive" (
+    [ testProperty "Exhaustive" $
         forAll (simpleTreeGen :: Gen (Tree ())) (\t -> length (foldr (:) [] t) == size t)
-      )
-    , testProperty "Increasing depth" (
-        forAll (simpleTreeGen :: Gen (Tree ())) (
+
+    , testProperty "Increasing depth" $
+        forAll (simpleTreeGen :: Gen (Tree ())) $
           isAsc . map depth . accum breadthNext . fromTree
-        )
-      )
     ]
   ]
 
