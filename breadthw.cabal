@@ -11,16 +11,28 @@ build-type:          Simple
 cabal-version:       >=1.10
 extra-source-files:  README.md
 
-executable breadthw
+library
   hs-source-dirs:      src
+  exposed-modules:     Breadthw
+  ghc-options:         -W -Wall
+  build-depends:       base >= 4.7 && < 5
+                     , containers >= 0.5.7 && < 0.6
+                     , directory >= 1.3.0 && < 1.4
+                     , pipes >= 4.1.0 && < 4.4
+                     , protolude >= 0.1.6 && < 0.2
+                     , text >= 1.2.2.1 && < 1.3
+                     , transformers >= 0.5.2.0 && < 0.6
+  default-language:    Haskell2010
+  default-extensions:  OverloadedStrings, NoImplicitPrelude
+
+executable breadthw-exe
+  hs-source-dirs:      app
   main-is:             Main.hs
   default-language:    Haskell2010
-  build-depends:       base >= 4.7 && < 5,
-                       containers >= 0.5.7 && < 0.6,
-                       directory >= 1.3.0 && < 1.4,
-                       optparse-applicative >= 0.13 && < 0.14,
-                       pipes >= 4.3.2 && < 4.4,
-                       protolude >= 0.1.6 && < 0.2,
-                       text >= 1.2.2.1 && < 1.3,
-                       transformers >= 0.5.2.0 && < 0.6
+  build-depends:       base >= 4.7 && < 5
+                     , breadthw
+                     , optparse-applicative >= 0.12.1 && < 0.14
+                     , pipes >= 4.1.0 && < 4.4
+                     , protolude >= 0.1.6 && < 0.2
+                     , text >= 1.2.2.1 && < 1.3
   default-extensions:  OverloadedStrings, NoImplicitPrelude

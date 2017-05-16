@@ -1,24 +1,18 @@
-module Main where
+module Breadthw
+  (module Breadthw) where
 
-import           Protolude                 hiding ((<>))
-import           Prelude                   (String)
+import           Protolude
 
-import           Control.Exception
-import           Control.Monad
-import           Control.Monad.Trans.Maybe
+import           Control.Monad.Fail        (fail)
+import           Control.Monad.Trans.Maybe (runMaybeT)
 import qualified Data.List                 as L
-import           Data.Monoid
-import           Data.Sequence             (Seq, (><))
 import qualified Data.Sequence             as Seq
 import qualified Data.Text                 as T
-import qualified Data.Text.IO
-import qualified Options.Applicative       as OA
-import           Pipes                     hiding (for)
-import qualified Pipes                     as P
-import           System.Directory
+import           GHC.Unicode               (isPrint)
+import           Pipes                     (Producer, yield)
+import           System.Directory          (doesDirectoryExist, doesFileExist,
+                                            pathIsSymbolicLink, listDirectory)
 import           System.IO                 (hPutStrLn)
-
-import           GHC.Unicode
 
 
 type TextPath = Text
@@ -31,39 +25,13 @@ data Opts = Opts {
   startDir       :: TextPath
 }
 
-parseFileType ::  (IsString a, Eq a) => a -> Either String FileType
-parseFileType "d" = return FTDir
-parseFileType "f" = return FTFile
-parseFileType "a" = return FTBoth
-parseFileType _   = fail "type should be \"a\", \"f\" or \"d\""
-
-optsP :: OA.Parser Opts
-optsP = Opts
-  <$> OA.option (OA.eitherReader parseFileType)
-      ( OA.long "file-type"
-     <> OA.short 't'
-     <> OA.help "File types to return (a|f|d)"
-     <> OA.value FTBoth
-     <> OA.metavar "FT" )
-  <*> OA.switch
-      ( OA.long "skip-hidden"
-     <> OA.short 's'
-     <> OA.help "Whether to walk into hidden dirs/files" )
-  <*> OA.switch
-      ( OA.long "follow-symlink"
-     <> OA.short 'f'
-     <> OA.help "Whether to follow symlinks (dangerous)" )
-  <*> OA.argument (map T.pack OA.str)
-      ( OA.metavar "DIR"
-     <> OA.help "Starting directory"
-     <> OA.value (T.pack ".") )
-
-
 -- some path utils
 fileName :: TextPath -> TextPath
 fileName = T.takeWhileEnd (/= '/')
 
 combine :: TextPath -> TextPath -> TextPath
+combine p1 "" = p1
+combine "" p2 = p2
 combine p1 p2 =
   if "/" `T.isSuffixOf` p1
      then p1 <> p2
@@ -133,7 +101,9 @@ walkOnce opts p = map (fromMaybe []) $ runMaybeT $ do
 
 -- recursive walk
 walkDir :: Opts -> Producer TextPath IO ()
-walkDir opts = walkd (Seq.fromList [startDir opts]) where
+walkDir opts = walkd initWalk where
+  initWalk = Seq.fromList [startDir opts]
+
   walkd :: Seq TextPath  -> Producer TextPath IO ()
   walkd q =
     case Seq.viewl q of
@@ -144,20 +114,8 @@ walkDir opts = walkd (Seq.fromList [startDir opts]) where
 
         when (match && x /= startDir opts) (yield x)
 
-        walkd $ xs >< Seq.fromList children
-
+        walkd $ xs Seq.>< Seq.fromList children
 
 -- small cosmetic arrangement
 formatPath :: TextPath -> TextPath
 formatPath p = p `fromMaybe` T.stripPrefix "./" p
-
-
-mainWalk :: Opts -> IO ()
-mainWalk opts = runEffect $ P.for (walkDir opts) disp
-  where
-    disp = lift . putStrLn . formatPath
-
-main :: IO ()
-main = OA.execParser opts >>= mainWalk
-  where
-    opts = OA.info (OA.helper <*> optsP) OA.fullDesc
