@@ -149,7 +149,10 @@ childrenRightOfPath zt p | pathFromRoot zt < truncP = return []
     n = fromMaybe 0 (atMay p (depth zt))
 
 -- Note: naive implementation
--- childrenRightOfPath zt p = filter (\c -> p < pathFromRoot c) $ downChildren zt
+-- childrenRightOfPath :: (TreeExpand m) => ZipTree a -> [Int] -> m [ZipTree a]
+-- childrenRightOfPath zt p = do
+--   ch <- downChildren zt
+--   return $ filter (\c -> p < pathFromRoot c) ch
 
 goDownRightOfPath :: (TreeExpand m) => ZipTree a -> [Int] -> MaybeT m (ZipTree a)
 goDownRightOfPath zt p = do
