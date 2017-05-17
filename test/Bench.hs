@@ -17,11 +17,15 @@ fixedRandomTree s = unG (mkQCGen 1) 1
     (MkGen unG) = resize s simpleTreeGen
 
 suite :: [Benchmark]
-suite = [ bench "breadth-first fold" (
-            whnf (runIdentity .  foldrT (\_ y -> y + 1 :: Int) 0) (force . fromTTree $ fixedRandomTree 10000)
+suite = [ bench "breadth-first fold (size 1000)" (
+            whnf (runIdentity .  foldrT (\_ y -> y + 1 :: Int) 0) (force . fromTTree $ fixedRandomTree 1000)
           )
 
-        , bench "regular tree fold" (
+        , bench "regular tree fold (size 1000)" (
+            whnf (foldr' (\_ y -> y + 1 :: Int) 0) (force $ fixedRandomTree 1000)
+          )
+
+        , bench "regular tree fold (size 10000)" (
             whnf (foldr' (\_ y -> y + 1 :: Int) 0) (force $ fixedRandomTree 10000)
           )
         ]
