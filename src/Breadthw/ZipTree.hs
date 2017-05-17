@@ -3,20 +3,41 @@ module Breadthw.ZipTree where
 import           Protolude hiding (orElse)
 
 -- import qualified Data.List     as L
+import qualified Data.Tree     as T
 import           Data.Sequence (Seq, (><), (|>), (<|))
 import qualified Data.Sequence as Seq
 
+import           Control.Monad.Fail
+import           Control.Monad.Trans.Maybe
+
 
 data Tree a = Node a (Forest a) deriving (Show, Eq)
-type Forest a = Seq (Tree a)
+data Forest a = FThunk | FVal (Seq (Tree a)) deriving (Show, Eq)
 
-size :: Tree a -> Int
-size (Node _ forest) = foldr ((+) . size) 1 forest
+fromTTree :: T.Tree a -> Tree a
+fromTTree tt = Node r (FVal $ Seq.fromList . map fromTTree $ f)
+  where
+    r = T.rootLabel tt
+    f = T.subForest tt
+
+size :: (TreeExpand m) => ZipTree a -> m Int
+size zt = do
+  sizes <- mapM size =<< downChildren zt
+  return $ 1 + sum sizes
 
 data Step a = Step a Int (Forest a) (Forest a) deriving (Show, Eq)
 type Steps a = [Step a]
 
 type ZipTree a = (Tree a, Steps a)
+
+class Monad m => TreeExpand m where
+  expChildren :: ZipTree a -> m [a]
+
+instance TreeExpand Identity where
+  expChildren _ = return []
+
+runPureMaybeT :: MaybeT Identity a -> Maybe a
+runPureMaybeT = runIdentity . runMaybeT
 
 root :: Tree a -> a
 root (Node e _) = e
@@ -44,47 +65,57 @@ farthest f e =
     Nothing -> e
     Just e1 -> farthest f e1
 
+accumT :: (Monad m) => (a -> MaybeT m a) -> a -> m [a]
+accumT f e = do
+  r <- runMaybeT $ f e
+  case r of
+    Nothing -> return [e]
+    Just e1 -> map (e :) $ accumT f e1
+
 accum :: (a -> Maybe a) -> a -> [a]
-accum f e =
-  case f e of
-    Nothing -> [e]
-    Just e1 -> e : accum f e1
+accum f e = runIdentity $ accumT (MaybeT . return . f) e
 
 upward :: ZipTree a -> Maybe (ZipTree a)
 upward (_, [])                  = Nothing
-upward (t, Step r _ f1 f2 : st) = Just (Node r (f1 >< Seq.singleton t >< f2), st)
+upward (t, Step r _ (FVal f1) (FVal f2) : st) = Just (Node r (FVal $ f1 >< Seq.singleton t >< f2), st)
+upward _                        = undefined  -- should not be possible
 
 upToRoot :: ZipTree a -> ZipTree a
 upToRoot = farthest upward
 
 goRight :: ZipTree a -> Maybe (ZipTree a)
 goRight (_, []) = Nothing
-goRight (t, Step r nc lf rf : st) =
+goRight (t, Step r nc (FVal lf) (FVal rf) : st) =
   case Seq.viewl rf of
     Seq.EmptyL     -> Nothing
-    (nt Seq.:< xs) -> Just (nt, Step r (nc + 1) (lf |> t) xs : st)
+    (nt Seq.:< xs) -> Just (nt, Step r (nc + 1) (FVal $ lf |> t) (FVal xs) : st)
+goRight _ = undefined
 
 goLeft :: ZipTree a -> Maybe (ZipTree a)
 goLeft (_, []) = Nothing
-goLeft (t, Step r nc lf rf : st) =
+goLeft (t, Step r nc (FVal lf) (FVal rf) : st) =
   case Seq.viewr lf of
     Seq.EmptyR     -> Nothing
-    (xs Seq.:> nt) -> Just (nt, Step r (nc - 1) xs (t <| rf) : st)
+    (xs Seq.:> nt) -> Just (nt, Step r (nc - 1) (FVal xs) (FVal (t <| rf)) : st)
+goLeft _ = undefined
 
-downChild :: Int -> ZipTree a -> Maybe (ZipTree a)
-downChild k (Node r forest, stps) =
+downChild :: (TreeExpand m) => Int -> ZipTree a -> MaybeT m (ZipTree a)
+downChild k e@(Node r FThunk, stps) = do
+  children <- lift $ Seq.fromList . map (`Node` FThunk) <$> expChildren e
+  downChild k (Node r (FVal children), stps)
+downChild k (Node r (FVal forest), stps) =
   if k >= length forest
-     then Nothing
-     else Just (child, step : stps)
+     then fail ""
+     else return (child, step : stps)
        where
          child = Seq.index forest k
-         step = Step r k before (Seq.drop 1 after)
+         step = Step r k (FVal before) (FVal $ Seq.drop 1 after)
          (before, after) = Seq.splitAt k forest
 
-downChildren :: ZipTree a -> [ZipTree a]
-downChildren t = fromMaybe [] $ do
-  firstChild <- downChild 0 t
-  Just $ accum goRight firstChild
+downChildren :: (TreeExpand m) => ZipTree a -> m [ZipTree a]
+downChildren zt = map (fromMaybe []) $ runMaybeT $ do
+  firstChild <- downChild 0 zt
+  return $ accum goRight firstChild
 
 pathFromRoot :: ZipTree a -> [Int]
 pathFromRoot (_, stps) = reverse $ map (\(Step _ k _ _) -> k) stps
@@ -92,12 +123,12 @@ pathFromRoot (_, stps) = reverse $ map (\(Step _ k _ _) -> k) stps
 elemsFromRoot :: ZipTree a -> [a]
 elemsFromRoot (_, stps) = reverse $ map (\(Step e _ _ _) -> e) stps
 
-goPath :: [Int] -> ZipTree a -> Maybe (ZipTree a)
-goPath [] t = Just t
+goPath :: (TreeExpand m) => [Int] -> ZipTree a -> MaybeT m (ZipTree a)
+goPath [] t = return t
 goPath (x:xs) t = downChild x t >>= goPath xs
 
-foldPath :: (a -> a -> a) -> a -> [Int] -> ZipTree a -> Maybe a
-foldPath f c [] t = Just $ f c (root $ view t)
+foldPath :: (TreeExpand m) => (a -> a -> a) -> a -> [Int] -> ZipTree a -> MaybeT m a
+foldPath f c [] t = return $ f c (root $ view t)
 foldPath f c (x:xs) t = do
   child <- downChild x t
   foldPath f (f c (root $ view t)) xs child
@@ -105,10 +136,10 @@ foldPath f c (x:xs) t = do
 
 -- movements for breadth search
 
-childrenRightOfPath :: ZipTree a -> [Int] -> [ZipTree a]
-childrenRightOfPath zt p | pathFromRoot zt < truncP = []
+childrenRightOfPath :: (TreeExpand m) => ZipTree a -> [Int] -> m [ZipTree a]
+childrenRightOfPath zt p | pathFromRoot zt < truncP = return []
                          | pathFromRoot zt > truncP = downChildren zt
-                         | otherwise                = drop (n+1) (downChildren zt)
+                         | otherwise                = map (drop (n+1)) $ downChildren zt
   where
     truncP = take (depth zt) p
     n = fromMaybe 0 (atMay p (depth zt))
@@ -116,34 +147,39 @@ childrenRightOfPath zt p | pathFromRoot zt < truncP = []
 -- Note: naive implementation
 -- childrenRightOfPath zt p = filter (\c -> p < pathFromRoot c) $ downChildren zt
 
-goDownRightOfPath :: ZipTree a -> [Int] -> Maybe (ZipTree a)
-goDownRightOfPath zt p = head $ childrenRightOfPath zt p
+goDownRightOfPath :: (TreeExpand m) => ZipTree a -> [Int] -> MaybeT m (ZipTree a)
+goDownRightOfPath zt p = do
+  c <- lift $ childrenRightOfPath zt p
+  MaybeT $ map head (return c)
 
 
-goAbsRight :: ZipTree a -> Maybe (ZipTree a)
+goAbsRight :: (TreeExpand m) => ZipTree a -> MaybeT m (ZipTree a)
 goAbsRight zt = expl startPath zt
   where
     startPath = pathFromRoot zt
     tdepth = depth zt
-    expl path z | depth z == tdepth && cPath > startPath = Just z
+    expl path z | depth z == tdepth && cPath > startPath = return z
                 | otherwise                              = do
-                    -- trace (show path <> (show . view $ z) :: Text) (return ())
-                    next <- goDownRightOfPath z path <|> upward z
+                    next <- goDownRightOfPath z path <|> (MaybeT . return) (upward z)
                     expl cPath next
       where
         cPath = pathFromRoot z
 
-goDepthFarLeft :: ZipTree a -> Int -> Maybe (ZipTree a)
+goDepthFarLeft :: (TreeExpand m) => ZipTree a -> Int -> MaybeT m (ZipTree a)
 goDepthFarLeft zt d = goFarLeft $ upToRoot zt
   where
     goFarLeft z =
       if depth z == d
-         then Just z
-         else asum (map goFarLeft $ downChildren z)
+         then return z
+         else do
+           children <- lift $ downChildren z
+           asum (map goFarLeft children)
 
-breadthNext :: ZipTree a -> Maybe (ZipTree a)
+breadthNext :: (TreeExpand m) => ZipTree a -> MaybeT m (ZipTree a)
 breadthNext zt =
   goAbsRight zt <|> goDepthFarLeft zt (depth zt + 1)
 
-instance Foldable Tree where
-  foldr f x0 t = foldr f x0 (map (root . view) $ accum breadthNext $ fromTree t)
+foldrT :: (TreeExpand m) => (a -> b -> b) -> b -> Tree a -> m b
+foldrT f x0 t = do
+  l <- accumT breadthNext (fromTree t)
+  return $ foldr (f . root .view) x0 l
