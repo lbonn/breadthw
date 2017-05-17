@@ -1,3 +1,6 @@
+{-# LANGUAGE FlexibleInstances     #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
+
 module Breadthw.ZipTree where
 
 import           Protolude hiding (orElse)
@@ -24,7 +27,7 @@ fromTTree tt = Node r (FVal $ Seq.fromList . map fromTTree $ f)
     r = T.rootLabel tt
     f = T.subForest tt
 
-size :: (TreeExpand m) => ZipTree a -> m Int
+size :: (TreeExpand m a) => ZipTree a -> m Int
 size zt = do
   sizes <- mapM size =<< downChildren zt
   return $ 1 + sum sizes
@@ -34,10 +37,10 @@ type Steps a = [Step a]
 
 type ZipTree a = (Tree a, Steps a)
 
-class Monad m => TreeExpand m where
+class Monad m => TreeExpand m a where
   expChildren :: ZipTree a -> m [a]
 
-instance TreeExpand Identity where
+instance TreeExpand Identity a where
   expChildren _ = return []
 
 runPureMaybeT :: MaybeT Identity a -> Maybe a
@@ -103,7 +106,7 @@ goLeft (t, Step r nc (FVal lf) (FVal rf) : st) =
     (xs Seq.:> nt) -> Just (nt, Step r (nc - 1) (FVal xs) (FVal (t <| rf)) : st)
 goLeft _ = undefined
 
-downChild :: (TreeExpand m) => Int -> ZipTree a -> MaybeT m (ZipTree a)
+downChild :: (TreeExpand m a) => Int -> ZipTree a -> MaybeT m (ZipTree a)
 downChild k e@(Node r FThunk, stps) = do
   children <- lift $ Seq.fromList . map (`Node` FThunk) <$> expChildren e
   downChild k (Node r (FVal children), stps)
@@ -116,7 +119,7 @@ downChild k (Node r (FVal forest), stps) =
          step = Step r k (FVal before) (FVal $ Seq.drop 1 after)
          (before, after) = Seq.splitAt k forest
 
-downChildren :: (TreeExpand m) => ZipTree a -> m [ZipTree a]
+downChildren :: (TreeExpand m a) => ZipTree a -> m [ZipTree a]
 downChildren zt = map (fromMaybe []) $ runMaybeT $ do
   firstChild <- downChild 0 zt
   return $ accum goRight firstChild
@@ -127,11 +130,11 @@ pathFromRoot (_, stps) = reverse $ map (\(Step _ k _ _) -> k) stps
 elemsFromRoot :: ZipTree a -> [a]
 elemsFromRoot (_, stps) = reverse $ map (\(Step e _ _ _) -> e) stps
 
-goPath :: (TreeExpand m) => [Int] -> ZipTree a -> MaybeT m (ZipTree a)
+goPath :: (TreeExpand m a) => [Int] -> ZipTree a -> MaybeT m (ZipTree a)
 goPath [] t = return t
 goPath (x:xs) t = downChild x t >>= goPath xs
 
-foldPath :: (TreeExpand m) => (a -> a -> a) -> a -> [Int] -> ZipTree a -> MaybeT m a
+foldPath :: (TreeExpand m a) => (a -> a -> a) -> a -> [Int] -> ZipTree a -> MaybeT m a
 foldPath f c [] t = return $ f c (root $ view t)
 foldPath f c (x:xs) t = do
   child <- downChild x t
@@ -140,7 +143,7 @@ foldPath f c (x:xs) t = do
 
 -- movements for breadth search
 
-goDownRightOfPath :: (TreeExpand m) => ZipTree a -> [Int] -> MaybeT m (ZipTree a)
+goDownRightOfPath :: (TreeExpand m a) => ZipTree a -> [Int] -> MaybeT m (ZipTree a)
 goDownRightOfPath zt p | pathFromRoot zt < truncP = fail ""
                        | pathFromRoot zt > truncP = downChild 0 zt
                        | otherwise                = downChild (n+1) zt
@@ -148,7 +151,7 @@ goDownRightOfPath zt p | pathFromRoot zt < truncP = fail ""
     truncP = take (depth zt) p
     n = fromMaybe 0 (atMay p (depth zt))
 
-goAbsRight :: (TreeExpand m) => ZipTree a -> MaybeT m (ZipTree a)
+goAbsRight :: (TreeExpand m a) => ZipTree a -> MaybeT m (ZipTree a)
 goAbsRight zt = expl startPath zt
   where
     startPath = pathFromRoot zt
@@ -160,7 +163,7 @@ goAbsRight zt = expl startPath zt
       where
         cPath = pathFromRoot z
 
-goDepthFarLeft :: (TreeExpand m) => ZipTree a -> Int -> MaybeT m (ZipTree a)
+goDepthFarLeft :: (TreeExpand m a) => ZipTree a -> Int -> MaybeT m (ZipTree a)
 goDepthFarLeft zt d = goFarLeft $ upToRoot zt
   where
     goFarLeft z =
@@ -170,11 +173,11 @@ goDepthFarLeft zt d = goFarLeft $ upToRoot zt
            firstChild <- downChild 0 z
            asum $ map goFarLeft (accum goRight firstChild)
 
-breadthNext :: (TreeExpand m) => ZipTree a -> MaybeT m (ZipTree a)
+breadthNext :: (TreeExpand m a) => ZipTree a -> MaybeT m (ZipTree a)
 breadthNext zt =
   goAbsRight zt <|> goDepthFarLeft zt (depth zt + 1)
 
-foldTree :: (TreeExpand m) => (a -> b -> b) -> b -> Tree a -> m b
+foldTree :: (TreeExpand m a) => (a -> b -> b) -> b -> Tree a -> m b
 foldTree f x0 t = do
   l <- accumT breadthNext (fromTree t)
   return $ foldr (f . root .view) x0 l
