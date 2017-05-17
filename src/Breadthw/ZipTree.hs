@@ -80,9 +80,9 @@ accum :: (a -> Maybe a) -> a -> [a]
 accum f e = runIdentity $ accumT (MaybeT . return . f) e
 
 upward :: ZipTree a -> Maybe (ZipTree a)
-upward (_, [])                  = Nothing
+upward (_, []) = Nothing
 upward (t, Step r _ (FVal f1) (FVal f2) : st) = Just (Node r (FVal $ f1 >< Seq.singleton t >< f2), st)
-upward _                        = undefined  -- should not be possible
+upward _ = undefined  -- should not be possible
 
 upToRoot :: ZipTree a -> ZipTree a
 upToRoot = farthest upward
@@ -142,8 +142,8 @@ foldPath f c (x:xs) t = do
 
 goDownRightOfPath :: (TreeExpand m) => ZipTree a -> [Int] -> MaybeT m (ZipTree a)
 goDownRightOfPath zt p | pathFromRoot zt < truncP = fail ""
-                          | pathFromRoot zt > truncP = downChild 0 zt
-                          | otherwise                = downChild (n+1) zt
+                       | pathFromRoot zt > truncP = downChild 0 zt
+                       | otherwise                = downChild (n+1) zt
   where
     truncP = take (depth zt) p
     n = fromMaybe 0 (atMay p (depth zt))
