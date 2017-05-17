@@ -174,7 +174,7 @@ breadthNext :: (TreeExpand m) => ZipTree a -> MaybeT m (ZipTree a)
 breadthNext zt =
   goAbsRight zt <|> goDepthFarLeft zt (depth zt + 1)
 
-foldrT :: (TreeExpand m) => (a -> b -> b) -> b -> Tree a -> m b
-foldrT f x0 t = do
+foldTree :: (TreeExpand m) => (a -> b -> b) -> b -> Tree a -> m b
+foldTree f x0 t = do
   l <- accumT breadthNext (fromTree t)
   return $ foldr (f . root .view) x0 l

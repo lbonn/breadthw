@@ -55,7 +55,7 @@ qTests = testGroup "Quick checks"
     [ testProperty "Exhaustive" $
         forAll (fromTTree <$> simpleTreeGen :: Gen (Tree ())) (\t -> runIdentity $ do
           s <- size $ fromTree t
-          return $ runIdentity (foldrT (\_ y -> y + 1) 0 t) == s
+          return $ runIdentity (foldTree (\_ y -> y + 1) 0 t) == s
         )
 
     , testProperty "Increasing depth" $

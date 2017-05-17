@@ -18,7 +18,7 @@ fixedRandomTree s = unG (mkQCGen 1) 1
 
 suite :: [Benchmark]
 suite = [ bench "breadth-first fold (size 1000)" (
-            whnf (runIdentity .  foldrT (\_ y -> y + 1 :: Int) 0) (force . fromTTree $ fixedRandomTree 1000)
+            whnf (runIdentity .  foldTree (\_ y -> y + 1 :: Int) 0) (force . fromTTree $ fixedRandomTree 1000)
           )
 
         , bench "regular tree fold (size 1000)" (
