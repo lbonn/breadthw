@@ -12,7 +12,7 @@ import           Data.Maybe       (fromJust)
 
 import           Breadthw.ZipTree
 
-import           ZipTree.Gen
+import           Tree.Gen
 
 -- regular unit tests
 bigTree :: Tree Int
@@ -53,13 +53,13 @@ qTests :: TestTree
 qTests = testGroup "Quick checks"
   [ testGroup "Breadth-first traversal"
     [ testProperty "Exhaustive" $
-        forAll (simpleTreeGen :: Gen (Tree ())) (\t -> runIdentity $ do
+        forAll (fromTTree <$> simpleTreeGen :: Gen (Tree ())) (\t -> runIdentity $ do
           s <- size $ fromTree t
           return $ runIdentity (foldrT (\_ y -> y + 1) 0 t) == s
         )
 
     , testProperty "Increasing depth" $
-        forAll (simpleTreeGen :: Gen (Tree ())) $
+        forAll (fromTTree <$> simpleTreeGen :: Gen (Tree ())) $
           isAsc . map depth . (runIdentity . accumT breadthNext) . fromTree
     ]
   ]

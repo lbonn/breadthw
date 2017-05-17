@@ -42,7 +42,7 @@ test-suite breadthw-test
   type:                exitcode-stdio-1.0
   hs-source-dirs:      test
   main-is:             Spec.hs
-  other-modules:       ZipTree.Gen
+  other-modules:       Tree.Gen
   build-depends:       base >= 4.7 && < 5
                      , protolude
                      , breadthw
@@ -59,7 +59,7 @@ benchmark breadthw-bench
   type:                exitcode-stdio-1.0
   hs-source-dirs:      test
   main-is:             Bench.hs
-  other-modules:       ZipTree.Gen
+  other-modules:       Tree.Gen
   build-depends:       base >= 4.7 && < 5
                      , protolude
                      , breadthw
