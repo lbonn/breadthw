@@ -9,19 +9,19 @@ import           Test.Tasty.QuickCheck
 import qualified Data.Tree     as T
 import           Data.Maybe       (fromJust)
 
-import           Data.Sequence    (fromList)
-import qualified Data.Sequence as Seq
 
 import           Breadthw.ZipTree
 
--- regular unit tests
-leaf :: a -> T.Tree a
-leaf e = T.Node e []
+import           ZipTree.Gen
 
+-- regular unit tests
 bigTree :: Tree Int
 bigTree = fromTTree $ T.Node 1  [ T.Node 2 [leaf 4, leaf 5, T.Node 6 [leaf 9, leaf 10]]
                                 , T.Node 3 [leaf 7, T.Node 8 [leaf 11]]
                                 ]
+  where
+    leaf e = T.Node e []
+
 bigZt :: ZipTree Int
 bigZt = fromTree bigTree
 
@@ -44,23 +44,6 @@ hTests = testGroup "Unit tests"
 
 -- quickcheck
 
-sizesg :: Int -> Gen (Seq Int)
-sizesg 0 = return empty
-sizesg 1 = return (fromList [1])
-sizesg n = do
-  p <- choose (1, n-1)
-  (p Seq.<|) <$> sizesg (n-p)
-
-simpleTreeGen :: Arbitrary a => Gen (Tree a)
-simpleTreeGen = sized . fix $ \f n ->
-  if n == 0
-     then arbitrary >>= (\e -> return $ Node e (FVal empty))
-     else do
-       r <- sizesg (n-1)
-       forest <- mapM f r
-       e <- arbitrary
-       return $ Node e (FVal forest)
-
 isAsc :: (Ord a) => [a] -> Bool
 isAsc [] = True
 isAsc [_] = True
@@ -72,7 +55,7 @@ qTests = testGroup "Quick checks"
     [ testProperty "Exhaustive" $
         forAll (simpleTreeGen :: Gen (Tree ())) (\t -> runIdentity $ do
           s <- size $ fromTree t
-          return $ length (runIdentity $ foldrT (:) [] t) == s
+          return $ runIdentity (foldrT (\_ y -> y + 1) 0 t) == s
         )
 
     , testProperty "Increasing depth" $
