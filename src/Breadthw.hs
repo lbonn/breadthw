@@ -1,9 +1,14 @@
+{-# LANGUAGE FlexibleInstances          #-}
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE MultiParamTypeClasses      #-}
+
 module Breadthw
   (module Breadthw) where
 
 import           Protolude
 
 import           Control.Monad.Fail        (fail)
+import           Control.Monad.Reader      (runReaderT)
 import           Control.Monad.Trans.Maybe (runMaybeT)
 import qualified Data.List                 as L
 import qualified Data.Sequence             as Seq
@@ -11,9 +16,11 @@ import qualified Data.Text                 as T
 import           GHC.Unicode               (isPrint)
 import           Pipes                     (Producer, yield)
 import           System.Directory          (doesDirectoryExist, doesFileExist,
-                                            pathIsSymbolicLink, listDirectory)
+                                            listDirectory, pathIsSymbolicLink)
 import           System.IO                 (hPutStrLn)
 
+
+import           Breadthw.ZipTree
 
 type TextPath = Text
 data FileType = FTDir | FTFile | FTBoth deriving Show
@@ -93,8 +100,7 @@ walkOnce opts p = map (fromMaybe []) $ runMaybeT $ do
       liftIO $ hPutStrLn stderr (T.unpack . show $ e)
       return []
     Right rl ->
-      return $ map (combine p) (L.sort trl)
-      where trl = map T.pack rl
+      return $ L.sort . map T.pack $ rl
   where
     pR = T.unpack p
 
@@ -110,11 +116,46 @@ walkDir opts = walkd initWalk where
       Seq.EmptyL -> return ()
       (x Seq.:< xs) -> do
         match <- liftIO $ matchOutputConds opts x
-        children <- liftIO $ if match then walkOnce opts x else return []
+        children <- liftIO $ if match then map (combine x) <$> walkOnce opts x else return []
 
         when (match && x /= startDir opts) (yield x)
 
         walkd $ xs Seq.>< Seq.fromList children
+
+-- ZipTree version
+
+currentNodePath :: ZipTree TextPath -> TextPath
+currentNodePath zt = foldr' combine "" (elemsFromRoot zt) `combine` (root . view $ zt)
+
+newtype OptsIO a = OptsIO (ReaderT Opts IO a)
+  deriving (Functor, Applicative, Monad, MonadIO, MonadReader Opts)
+
+instance TreeExpand OptsIO TextPath where
+  expChildren zt = do
+    let fPath = currentNodePath zt
+    opts <- ask
+    match <- liftIO $ matchOutputConds opts fPath
+    liftIO $ if match then walkOnce opts fPath else return []
+
+runOptsIO :: Opts -> OptsIO a -> IO a
+runOptsIO opts (OptsIO act) = runReaderT act opts
+
+walkDirZip :: Opts -> Producer TextPath IO ()
+walkDirZip opts = walkd startPoint
+  where
+    startPoint = fromTree (Node (startDir opts) FThunk)
+
+    walkd :: ZipTree TextPath -> Producer TextPath IO ()
+    walkd zt = do
+      let fPath = currentNodePath zt
+
+      match <- liftIO $ matchOutputConds opts fPath
+
+      when (match && fPath /= startDir opts) (yield fPath)
+
+      -- elect next path
+      next <- liftIO $ (runOptsIO opts . runMaybeT) (breadthNext zt)
+      maybe (return ()) walkd next
 
 -- small cosmetic arrangement
 formatPath :: TextPath -> TextPath

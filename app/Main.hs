@@ -40,7 +40,7 @@ optsP = Opts
 
 
 mainWalk :: Opts -> IO ()
-mainWalk opts = P.runEffect $ P.for (walkDir opts) disp
+mainWalk opts = P.runEffect $ P.for (walkDirZip opts) disp
   where
     disp = lift . putStrLn . formatPath
 
