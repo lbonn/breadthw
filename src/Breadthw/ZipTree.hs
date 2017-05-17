@@ -140,25 +140,13 @@ foldPath f c (x:xs) t = do
 
 -- movements for breadth search
 
-childrenRightOfPath :: (TreeExpand m) => ZipTree a -> [Int] -> m [ZipTree a]
-childrenRightOfPath zt p | pathFromRoot zt < truncP = return []
-                         | pathFromRoot zt > truncP = downChildren zt
-                         | otherwise                = map (drop (n+1)) $ downChildren zt
+goDownRightOfPath :: (TreeExpand m) => ZipTree a -> [Int] -> MaybeT m (ZipTree a)
+goDownRightOfPath zt p | pathFromRoot zt < truncP = fail ""
+                          | pathFromRoot zt > truncP = downChild 0 zt
+                          | otherwise                = downChild (n+1) zt
   where
     truncP = take (depth zt) p
     n = fromMaybe 0 (atMay p (depth zt))
-
--- Note: naive implementation
--- childrenRightOfPath :: (TreeExpand m) => ZipTree a -> [Int] -> m [ZipTree a]
--- childrenRightOfPath zt p = do
---   ch <- downChildren zt
---   return $ filter (\c -> p < pathFromRoot c) ch
-
-goDownRightOfPath :: (TreeExpand m) => ZipTree a -> [Int] -> MaybeT m (ZipTree a)
-goDownRightOfPath zt p = do
-  c <- lift $ childrenRightOfPath zt p
-  MaybeT $ map head (return c)
-
 
 goAbsRight :: (TreeExpand m) => ZipTree a -> MaybeT m (ZipTree a)
 goAbsRight zt = expl startPath zt
@@ -179,8 +167,8 @@ goDepthFarLeft zt d = goFarLeft $ upToRoot zt
       if depth z == d
          then return z
          else do
-           children <- lift $ downChildren z
-           asum (map goFarLeft children)
+           firstChild <- downChild 0 z
+           asum $ map goFarLeft (accum goRight firstChild)
 
 breadthNext :: (TreeExpand m) => ZipTree a -> MaybeT m (ZipTree a)
 breadthNext zt =
