@@ -113,9 +113,9 @@ seeChildren n@(Node e FThunk, st)     = do
   return (Node e (FVal children), st)
 
 downChild :: (TreeExpand m a) => Int -> ZipTree a -> MaybeT m (ZipTree a)
-downChild k e@(Node r FThunk, stps) = do
-  children <- lift $ Seq.fromList . map (`Node` FThunk) <$> expChildren e
-  downChild k (Node r (FVal children), stps)
+downChild k zt@(Node _ FThunk, _tps) = do
+  zt' <- lift $ seeChildren zt
+  downChild k zt'
 downChild k (Node r (FVal forest), stps) =
   if k >= length forest
      then fail ""
@@ -176,16 +176,15 @@ goAbsRight zt = expl startPath zt
 goDepthFarLeft :: (TreeExpand m a) => ZipTree a -> Int -> MaybeT m (ZipTree a)
 goDepthFarLeft zt d = goFarLeft $ upToRoot zt
   where
-    goFarLeft z =
-      if depth z == d
-         then return z
-         else do
-           firstChild <- downChild 0 z
-           asum $ map goFarLeft (accum goRight firstChild)
+    goFarLeft z | depth z == d = return z
+                | otherwise    = do
+                    firstChild <- downChild 0 z
+                    asum $ map goFarLeft (accum goRight firstChild)
 
 breadthNext :: (TreeExpand m a) => ZipTree a -> MaybeT m (ZipTree a)
-breadthNext zt =
-  goAbsRight zt <|> goDepthFarLeft zt (depth zt + 1)
+breadthNext zt = do
+  zt' <- lift $ seeChildren zt
+  goAbsRight zt' <|> goDepthFarLeft zt' (depth zt' + 1)
 
 foldTree :: (TreeExpand m a) => (a -> b -> b) -> b -> Tree a -> m b
 foldTree f x0 t = do
