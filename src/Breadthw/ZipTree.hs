@@ -106,6 +106,12 @@ goLeft (t, Step r nc (FVal lf) (FVal rf) : st) =
     (xs Seq.:> nt) -> Just (nt, Step r (nc - 1) (FVal xs) (FVal (t <| rf)) : st)
 goLeft _ = undefined
 
+seeChildren :: (TreeExpand m a) => ZipTree a -> m (ZipTree a)
+seeChildren n@(Node _ (FVal _), _)  = return n
+seeChildren n@(Node e FThunk, st)     = do
+  children <- Seq.fromList . map (`Node` FThunk) <$> expChildren n
+  return (Node e (FVal children), st)
+
 downChild :: (TreeExpand m a) => Int -> ZipTree a -> MaybeT m (ZipTree a)
 downChild k e@(Node r FThunk, stps) = do
   children <- lift $ Seq.fromList . map (`Node` FThunk) <$> expChildren e
@@ -158,7 +164,11 @@ goAbsRight zt = expl startPath zt
     tdepth = depth zt
     expl path z | depth z == tdepth && cPath > startPath = return z
                 | otherwise                              = do
-                    next <- goDownRightOfPath z path <|> (MaybeT . return) (upward z)
+                    z' <- lift $ seeChildren z
+                    let down = if depth z < tdepth
+                                  then goDownRightOfPath z' path
+                                  else fail ""
+                    next <- down <|> (MaybeT . return) (upward z')
                     expl cPath next
       where
         cPath = pathFromRoot z
