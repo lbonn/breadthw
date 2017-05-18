@@ -38,8 +38,7 @@ newtype DummyExp a = DummyExp (Identity a)
 
 instance TreeExpand DummyExp () where
   expChildren zt | depth zt == 0 = return [(), ()]
-                 | depth zt == 1 = return [()]
-                 | otherwise     = return []
+                 | otherwise     = undefined
 
 runDummyExp :: DummyExp a -> a
 runDummyExp (DummyExp e) = runIdentity e
