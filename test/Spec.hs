@@ -1,3 +1,7 @@
+{-# LANGUAGE FlexibleInstances          #-}
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE MultiParamTypeClasses      #-}
+
 module Main where
 
 import           Protolude
@@ -6,6 +10,7 @@ import           Test.Tasty
 import           Test.Tasty.HUnit
 import           Test.Tasty.QuickCheck
 
+import           Control.Monad.Trans.Maybe (runMaybeT)
 import qualified Data.Tree     as T
 import           Data.Maybe       (fromJust)
 
@@ -28,6 +33,17 @@ bigZt = fromTree bigTree
 viewRoot :: ZipTree a -> a
 viewRoot = root . view
 
+newtype DummyExp a = DummyExp (Identity a)
+  deriving (Functor, Applicative, Monad)
+
+instance TreeExpand DummyExp () where
+  expChildren zt | depth zt == 0 = return [(), ()]
+                 | depth zt == 1 = return [()]
+                 | otherwise     = return []
+
+runDummyExp :: DummyExp a -> a
+runDummyExp (DummyExp e) = runIdentity e
+
 hTests :: TestTree
 hTests = testGroup "Unit tests"
   [ testCase "Go far left" $
@@ -40,6 +56,12 @@ hTests = testGroup "Unit tests"
   , testCase "Breadth-first traversal" $
       let traversal = foldr (\e l -> (root . view) e : l) [] (runIdentity $ accumT breadthNext bigZt) in
       assertEqual "Breadth traversal" [1,2,3,4,5,6,7,8,9,10,11] traversal
+
+  , testCase "Breadth-first laziness" $
+      let start = fromTree (Node () FThunk) in
+      let simpleNode = Node () FThunk in
+      let nextE = view <$> (runDummyExp . runMaybeT $ breadthNext start) in
+      assertEqual "Breadth-first laziness" nextE (Just simpleNode)
   ]
 
 -- quickcheck

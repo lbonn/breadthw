@@ -52,6 +52,7 @@ test-suite breadthw-test
                      , tasty
                      , tasty-hunit
                      , tasty-quickcheck
+                     , transformers
   ghc-options:         -W -Wall -threaded -rtsopts -with-rtsopts=-N
   default-language:    Haskell2010
   default-extensions:  OverloadedStrings, NoImplicitPrelude
