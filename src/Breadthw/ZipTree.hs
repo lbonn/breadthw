@@ -163,7 +163,7 @@ goDepthRightOfPath zt tdepth startPath = expl startPath zt
     expl path z | depth z == tdepth && cPath > startPath = return z
                 | otherwise                              = do
                     z' <- lift $ seeChildren z
-                    let down = if depth z < tdepth
+                    let down = if depth z' < tdepth
                                   then goDownRightOfPath z' path
                                   else fail ""
                     next <- down <|> (MaybeT . return) (upward z')
@@ -183,11 +183,11 @@ goDepthFarLeft zt d = goFarLeft $ upToRoot zt
                     asum $ map goFarLeft (accum goRight firstChild)
 
 -- | go up and delete each node without any child
-trimUp :: (TreeExpand m a) => ZipTree a -> MaybeT m (Maybe (ZipTree a, Int))
+trimUp :: (TreeExpand m a) => ZipTree a -> MaybeT m (ZipTree a, Maybe Int)
 trimUp t@(Node _ FThunk, _) = lift (seeChildren t) >>= \t' -> trimUp t'
 trimUp t@(Node _ (FVal children), _)
-  | not (null children) = return Nothing
-  | otherwise           = map Just (tUp t 0)
+  | not (null children) = return (t, Nothing)
+  | otherwise           = tUp t 0
   where
     tUp zt@(Node _ (FVal zChildren), _) j
       | null zChildren = do
@@ -196,7 +196,7 @@ trimUp t@(Node _ (FVal children), _)
 
         let (l, r) = (Seq.take k s, Seq.drop (k+1) s)
         tUp (Node p (FVal $ l <> r), st) k
-      | otherwise     = return (zt, j)
+      | otherwise     = return (zt, Just j)
     tUp zt j = do
       zt' <- lift $ seeChildren zt
       tUp zt' j
@@ -208,8 +208,8 @@ breadthNext zt = do
   e <- trimUp zt
   let firstTry =
         case e of
-             Nothing                  -> goAbsRight zt
-             Just (trimmed, childPos) -> let startPath = (pathFromRoot trimmed ++ [childPos-1]) in
+             (trimmed, Nothing)      -> goAbsRight trimmed
+             (trimmed, Just childPos) -> let startPath = (pathFromRoot trimmed ++ [childPos-1]) in
                                          goDepthRightOfPath trimmed tDepth startPath
   firstTry <|> goDepthFarLeft zt (tDepth + 1)
 
