@@ -107,7 +107,7 @@ goLeft (t, Step r nc (FVal lf) (FVal rf) : st) =
 goLeft _ = undefined
 
 seeChildren :: (TreeExpand m a) => ZipTree a -> m (ZipTree a)
-seeChildren n@(Node _ (FVal _), _)  = return n
+seeChildren n@(Node _ (FVal _), _)    = return n
 seeChildren n@(Node e FThunk, st)     = do
   children <- Seq.fromList . map (`Node` FThunk) <$> expChildren n
   return (Node e (FVal children), st)
@@ -157,11 +157,9 @@ goDownRightOfPath zt p | pathFromRoot zt < truncP = fail ""
     truncP = take (depth zt) p
     n = fromMaybe 0 (atMay p (depth zt))
 
-goAbsRight :: (TreeExpand m a) => ZipTree a -> MaybeT m (ZipTree a)
-goAbsRight zt = expl startPath zt
+goDepthRightOfPath :: (TreeExpand m a) => ZipTree a -> Int -> [Int] -> MaybeT m (ZipTree a)
+goDepthRightOfPath zt tdepth startPath = expl startPath zt
   where
-    startPath = pathFromRoot zt
-    tdepth = depth zt
     expl path z | depth z == tdepth && cPath > startPath = return z
                 | otherwise                              = do
                     z' <- lift $ seeChildren z
@@ -173,6 +171,9 @@ goAbsRight zt = expl startPath zt
       where
         cPath = pathFromRoot z
 
+goAbsRight :: (TreeExpand m a) => ZipTree a -> MaybeT m (ZipTree a)
+goAbsRight zt = goDepthRightOfPath zt (depth zt) (pathFromRoot zt)
+
 goDepthFarLeft :: (TreeExpand m a) => ZipTree a -> Int -> MaybeT m (ZipTree a)
 goDepthFarLeft zt d = goFarLeft $ upToRoot zt
   where
@@ -181,8 +182,36 @@ goDepthFarLeft zt d = goFarLeft $ upToRoot zt
                     firstChild <- downChild 0 z
                     asum $ map goFarLeft (accum goRight firstChild)
 
+-- | go up and delete each node without any child
+trimUp :: (TreeExpand m a) => ZipTree a -> MaybeT m (Maybe (ZipTree a, Int))
+trimUp t@(Node _ FThunk, _) = lift (seeChildren t) >>= \t' -> trimUp t'
+trimUp t@(Node _ (FVal children), _)
+  | not (null children) = return Nothing
+  | otherwise           = map Just (tUp t 0)
+  where
+    tUp zt@(Node _ (FVal zChildren), _) j
+      | null zChildren = do
+        k <- MaybeT $ return (idInParent zt)
+        (Node p (FVal s), st) <- MaybeT $ return (upward zt)
+
+        let (l, r) = (Seq.take k s, Seq.drop (k+1) s)
+        tUp (Node p (FVal $ l <> r), st) k
+      | otherwise     = return (zt, j)
+    tUp zt j = do
+      zt' <- lift $ seeChildren zt
+      tUp zt' j
+
 breadthNext :: (TreeExpand m a) => ZipTree a -> MaybeT m (ZipTree a)
-breadthNext zt = goAbsRight zt <|> goDepthFarLeft zt (depth zt + 1)
+breadthNext zt = do
+  let tDepth = depth zt
+
+  e <- trimUp zt
+  let firstTry =
+        case e of
+             Nothing                  -> goAbsRight zt
+             Just (trimmed, childPos) -> let startPath = (pathFromRoot trimmed ++ [childPos-1]) in
+                                         goDepthRightOfPath trimmed tDepth startPath
+  firstTry <|> goDepthFarLeft zt (tDepth + 1)
 
 foldTree :: (TreeExpand m a) => (a -> b -> b) -> b -> Tree a -> m b
 foldTree f x0 t = do
