@@ -183,6 +183,7 @@ goDepthFarLeft zt d = goFarLeft $ upToRoot zt
                     asum $ map goFarLeft (accum goRight firstChild)
 
 -- | go up and delete each node without any child
+--   returns the new tree and the position of the last removed child if any
 trimUp :: (TreeExpand m a) => ZipTree a -> MaybeT m (ZipTree a, Maybe Int)
 trimUp t@(Node _ FThunk, _) = lift (seeChildren t) >>= \t' -> trimUp t'
 trimUp t@(Node _ (FVal children), _)
@@ -208,7 +209,7 @@ breadthNext zt = do
   e <- trimUp zt
   let firstTry =
         case e of
-             (trimmed, Nothing)      -> goAbsRight trimmed
+             (trimmed, Nothing)       -> goAbsRight trimmed
              (trimmed, Just childPos) -> let startPath = (pathFromRoot trimmed ++ [childPos-1]) in
                                          goDepthRightOfPath trimmed tDepth startPath
   firstTry <|> goDepthFarLeft zt (tDepth + 1)
