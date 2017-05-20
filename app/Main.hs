@@ -28,7 +28,7 @@ optsP = Opts
   <*> switch
       ( long "zip"
      <> short 'z'
-     <> help "use zipper algorithm" )
+     <> help "Use zipper algorithm" )
   <*> switch
       ( long "skip-hidden"
      <> short 's'

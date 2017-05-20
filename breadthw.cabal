@@ -27,7 +27,7 @@ library
   default-language:    Haskell2010
   default-extensions:  OverloadedStrings, NoImplicitPrelude
 
-executable breadthw-exe
+executable breadthw
   hs-source-dirs:      app
   main-is:             Main.hs
   default-language:    Haskell2010
