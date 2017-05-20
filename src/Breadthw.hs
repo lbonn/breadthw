@@ -27,6 +27,7 @@ data FileType = FTDir | FTFile | FTBoth deriving Show
 
 data Opts = Opts {
   fileTypes      :: FileType,
+  zipAl          :: Bool,
   skipHidden     :: Bool,
   followSymlinks :: Bool,
   startDir       :: TextPath

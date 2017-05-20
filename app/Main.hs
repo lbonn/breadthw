@@ -26,6 +26,10 @@ optsP = Opts
      <> value FTBoth
      <> metavar "FT" )
   <*> switch
+      ( long "zip"
+     <> short 'z'
+     <> help "use zipper algorithm" )
+  <*> switch
       ( long "skip-hidden"
      <> short 's'
      <> help "Whether to walk into hidden dirs/files" )
@@ -40,9 +44,10 @@ optsP = Opts
 
 
 mainWalk :: Opts -> IO ()
-mainWalk opts = P.runEffect $ P.for (walkDirZip opts) disp
+mainWalk opts = P.runEffect $ P.for (walker opts) disp
   where
     disp = lift . putStrLn . formatPath
+    walker = if zipAl opts then walkDirZip else walkDir
 
 main :: IO ()
 main = execParser opts >>= mainWalk
