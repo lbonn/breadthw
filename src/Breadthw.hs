@@ -61,8 +61,14 @@ escapeWronglyEncoded = T.map esc where
        else '\65533'  -- Unicode REPLACEMENT CHARACTER
 
 -- validate a candidate for output (or not)
-matchOutputConds :: Opts -> TextPath -> IO Bool
-matchOutputConds opts p = map isJust $ runMaybeT $ do
+matchFt :: FileType -> TextPath -> IO Bool
+matchFt FTDir  = doesDirectoryExist . T.unpack
+matchFt FTFile = doesFileExist . T.unpack
+matchFt FTBoth = \_ -> return True
+
+-- | If this doesn't match, children should not be explored
+matchInterConds :: Opts -> TextPath -> IO Bool
+matchInterConds opts p = map isJust $ runMaybeT $ do
   -- is it badly encoded?
   unless (T.all isPrint p) $ do
     lift $ hPutStrLn stderr . T.unpack $ "bad encoding: " `mappend` escapeWronglyEncoded p
@@ -71,16 +77,9 @@ matchOutputConds opts p = map isJust $ runMaybeT $ do
   -- is it hidden and hidden files are skipped
   when (skipHidden opts && isHidden p) $ fail "hidden file"
 
-  -- is it the correct file type?
-  mft <- liftIO $ matchFt (fileTypes opts) p
-  unless mft $ fail "unwanted file type"
-
- where
-   matchFt :: FileType -> TextPath -> IO Bool
-   matchFt FTDir  = doesDirectoryExist . T.unpack
-   matchFt FTFile = doesFileExist . T.unpack
-   matchFt FTBoth = \_ -> return True
-
+-- | If this doesn't match, it should not be output
+matchOutputConds :: Opts -> TextPath -> IO Bool
+matchOutputConds opts p = liftIO $ matchFt (fileTypes opts) p
 
 -- walk one level into a dir at once
 walkOnce :: Opts -> TextPath -> IO [TextPath]
@@ -116,10 +115,12 @@ walkDir opts = walkd initWalk where
     case Seq.viewl q of
       Seq.EmptyL -> return ()
       (x Seq.:< xs) -> do
-        match <- liftIO $ matchOutputConds opts x
-        children <- liftIO $ if match then map (combine x) <$> walkOnce opts x else return []
+        shouldExpl <- liftIO $ matchInterConds opts x
+        children <- liftIO $ if shouldExpl then map (combine x) <$> walkOnce opts x else return []
 
-        when (match && x /= startDir opts) (yield x)
+        shouldOutput <- liftIO $ map (shouldExpl &&) (matchOutputConds opts x)
+
+        when (shouldOutput && x /= startDir opts) (yield x)
 
         walkd $ xs Seq.>< Seq.fromList children
 
@@ -135,8 +136,9 @@ instance TreeExpand OptsIO TextPath where
   expChildren zt = do
     let fPath = currentNodePath zt
     opts <- ask
-    match <- liftIO $ matchOutputConds opts fPath
-    liftIO $ if match then walkOnce opts fPath else return []
+
+    children <- liftIO $ walkOnce opts fPath
+    liftIO $ filterM (matchInterConds opts . (fPath `combine`)) children
 
 runOptsIO :: Opts -> OptsIO a -> IO a
 runOptsIO opts (OptsIO act) = runReaderT act opts
