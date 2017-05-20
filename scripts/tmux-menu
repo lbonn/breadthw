@@ -8,4 +8,6 @@ dir=$(breadthw -t d -s | rofi -dmenu -p 'tmux: ' -matching fuzzy)
 
 [ "$dir" ] && cd "$dir"
 
-exec i3-sensible-terminal -e tnew
+SANE_PWD="$(basename "$PWD" | tr . _)"
+
+exec i3-sensible-terminal -e tmux new-session -As "$SANE_PWD"
