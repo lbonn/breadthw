@@ -54,7 +54,7 @@ hTests = testGroup "Unit tests"
 
   , testCase "Breadth-first traversal" $
       let traversal = foldr (\e l -> (root . view) e : l) [] (runIdentity $ accumT breadthNext bigZt) in
-      assertEqual "Breadth traversal" [1,2,3,4,5,6,7,8,9,10,11] traversal
+      assertEqual "Breadth traversal" [1..11] traversal
 
   , testCase "Breadth-first laziness" $
       let start = fromTree (Node () FThunk) in
@@ -74,14 +74,15 @@ qTests :: TestTree
 qTests = testGroup "Quick checks"
   [ testGroup "Breadth-first traversal"
     [ testProperty "Exhaustive" $
-        forAll (fromTTree <$> simpleTreeGen :: Gen (Tree ())) (\t -> runIdentity $ do
+        forAll (simpleTreeGen :: Gen (T.Tree ())) (\tt -> runIdentity $ do
+          let t = fromTTree tt
           s <- size $ fromTree t
-          return $ runIdentity (foldTree (\_ y -> y + 1) 0 t) == s
+          return . counterexample (T.drawTree $ fmap (const "A") tt) $ runIdentity (foldTree (\_ y -> y + 1) 0 t) === s
         )
 
     , testProperty "Increasing depth" $
-        forAll (fromTTree <$> simpleTreeGen :: Gen (Tree ())) $
-          isAsc . map depth . (runIdentity . accumT breadthNext) . fromTree
+        forAll (simpleTreeGen :: Gen (T.Tree ())) $
+          isAsc . map depth . (runIdentity . accumT breadthNext) . fromTree . fromTTree
     ]
   ]
 
