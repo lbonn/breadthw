@@ -18,8 +18,10 @@ Try with:
 
     ./bench_mem <DIR>
 
-For now, ZipTree is behing, probably because of the structure overhead. It's not
-that bad though! Maybe it could win with collapsing straight branches.
+Unfortunately, the expected memory gains are meager for the moment. The maximum
+residency is about the same as the queue implementation, with twice the running
+time.
+Collapsing straight branches could probably help the tree win!
 
 Also, an excuse to play with QuickCheck and criterion!
 
