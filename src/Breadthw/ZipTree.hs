@@ -14,8 +14,8 @@ import           Control.Monad.Fail
 import           Control.Monad.Trans.Maybe
 
 
-data Tree a = Node a (Forest a) deriving (Show, Eq)
-data Forest a = FThunk | FVal (Seq (Tree a)) deriving (Show, Eq)
+data Tree a = Node !a !(Forest a) deriving (Show, Eq)
+data Forest a = FThunk | FVal !(Seq (Tree a)) deriving (Show, Eq)
 
 instance NFData a => NFData (Tree a) where
   rnf (Node e FThunk)   = rnf e
