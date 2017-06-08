@@ -183,7 +183,7 @@ goDepthFarLeft zt d = goFarLeft $ upToRoot zt
 -- | go up and delete each node without any child
 --   returns the new tree and the position of the last removed child if any
 trimUp :: (TreeExpand m a) => ZipTree a -> MaybeT m (ZipTree a, Maybe Int)
-trimUp t@(Node _ FThunk, _) = lift (seeChildren t) >>= \t' -> trimUp t'
+trimUp t@(Node _ FThunk, _) = lift (seeChildren t) >>= trimUp
 trimUp t@(Node _ (FVal children), _)
   | not (null children) = return (t, Nothing)
   | otherwise           = tUp t 0
