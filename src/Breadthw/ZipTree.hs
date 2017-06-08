@@ -16,6 +16,7 @@ import           Control.Monad.Trans.Maybe
 
 data Tree a = Node !a !(Forest a) deriving (Show, Eq)
 data Forest a = FThunk | FVal !(Seq (Tree a)) deriving (Show, Eq)
+type StrictForest a = Seq (Tree a)
 
 instance NFData a => NFData (Tree a) where
   rnf (Node e FThunk)   = rnf e
@@ -32,7 +33,7 @@ size zt = do
   sizes <- mapM size =<< downChildren zt
   return $ 1 + sum sizes
 
-data Step a = Step a Int (Forest a) (Forest a) deriving (Show, Eq)
+data Step a = Step a Int (StrictForest a) (StrictForest a) deriving (Show, Eq)
 type Steps a = [Step a]
 
 type ZipTree a = (Tree a, Steps a)
@@ -84,27 +85,24 @@ accum f e = runIdentity $ accumT (MaybeT . return . f) e
 
 upward :: ZipTree a -> Maybe (ZipTree a)
 upward (_, []) = Nothing
-upward (t, Step r _ (FVal f1) (FVal f2) : st) = Just (Node r (FVal $ f1 >< Seq.singleton t >< f2), st)
-upward _ = undefined  -- should not be possible
+upward (t, Step r _ f1 f2 : st) = Just (Node r (FVal $ f1 >< Seq.singleton t >< f2), st)
 
 upToRoot :: ZipTree a -> ZipTree a
 upToRoot = farthest upward
 
 goRight :: ZipTree a -> Maybe (ZipTree a)
 goRight (_, []) = Nothing
-goRight (t, Step r nc (FVal lf) (FVal rf) : st) =
+goRight (t, Step r nc lf rf : st) =
   case Seq.viewl rf of
     Seq.EmptyL     -> Nothing
-    (nt Seq.:< xs) -> Just (nt, Step r (nc + 1) (FVal $ lf |> t) (FVal xs) : st)
-goRight _ = undefined
+    (nt Seq.:< xs) -> Just (nt, Step r (nc + 1) (lf |> t) xs : st)
 
 goLeft :: ZipTree a -> Maybe (ZipTree a)
 goLeft (_, []) = Nothing
-goLeft (t, Step r nc (FVal lf) (FVal rf) : st) =
+goLeft (t, Step r nc lf rf : st) =
   case Seq.viewr lf of
     Seq.EmptyR     -> Nothing
-    (xs Seq.:> nt) -> Just (nt, Step r (nc - 1) (FVal xs) (FVal (t <| rf)) : st)
-goLeft _ = undefined
+    (xs Seq.:> nt) -> Just (nt, Step r (nc - 1) xs (t <| rf) : st)
 
 seeChildren :: (TreeExpand m a) => ZipTree a -> m (ZipTree a)
 seeChildren n@(Node _ (FVal _), _)    = return n
@@ -122,7 +120,7 @@ downChild k (Node r (FVal forest), stps) =
      else return (child, step : stps)
        where
          child = Seq.index forest k
-         step = Step r k (FVal before) (FVal $ Seq.drop 1 after)
+         step = Step r k before (Seq.drop 1 after)
          (before, after) = Seq.splitAt k forest
 
 downChildren :: (TreeExpand m a) => ZipTree a -> m [ZipTree a]
